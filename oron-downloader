@@ -84,15 +84,7 @@ class OronDownloader(object):
             log.info("Processing %s from %s", filename, href)
             self.download_link(href)
             if self.generate_thumbs:
-                try:
-                    self.generate_thumb(filename)
-                except Exception, err:
-                    log.warn("Something went wrong while generating thumbs. "
-                             "Disabling thumbs generation.")
-                    self.generate_thumbs = False
-                    log.exception(err)
-
-
+                self.generate_thumb(filename)
 
     def download_link(self, href):
         self.browser.open(href)
@@ -146,40 +138,46 @@ class OronDownloader(object):
 
     def generate_thumb(self, filename):
         log.info("Generating thumbs for %s", filename)
-        if not os.path.isdir(os.path.join(self.dest_dir, 'screenshots')):
-            os.makedirs(os.path.join(self.dest_dir, 'screenshots'))
+        screenshots_dest_dir = os.path.join(self.dest_dir, 'screenshots')
+        if not os.path.isdir(screenshots_dest_dir):
+            os.makedirs(screenshots_dest_dir)
 
         cmd = subprocess.Popen([
-            'mplayer', '-identify', os.path.join(self.dest_dir, filename)
+            'mplayer', '-vo', 'null', '-ao', 'null', '-frames', '0',
+            '-identify', os.path.join(self.dest_dir, filename)
         ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
         output = cmd.stdout.read()
         match = re.search(r'ID_LENGTH=([\d\.]+)', output)
         try:
-            print match.groups()
             skip_length = int(round(float(match.group(1))))/12
-        except:
+        except Exception, err:
             self.generate_thumbs = False
-            log.warn("Something went wrong while generating thumbs. "
+            log.warn("Something went wrong parsing video length. "
                      "Disabling thumbs generation.")
+            log.exception(err)
             print output
 
         try:
-            subprocess.call([
+            args = [
                 'mtn', '-f', self.font_path,
                 '-r', '4',
-                '-o', '.jpg',
+                '-o', '%s.jpg' % os.path.splitext(filename)[-1],
+                '-O', screenshots_dest_dir,
                 '-D', '8',
                 '-g', '2',
                 '-b', '0.5',
-                '-O', os.path.join(self.dest_dir, 'screenshots'),
                 '-s', str(skip_length),
-                os.path.join(CWD, f)
-            ], stderr=subprocess.PIPE)
-        except:
+                os.path.join(self.dest_dir, filename)
+            ]
+            #log.debug("CMDLINE: %s", ' '.join(args))
+            subprocess.call(args, stderr=subprocess.PIPE)
+        except Exception, err:
             log.warn("Something went wrong while generating thumbs. "
                      "Disabling thumbs generation.")
             self.generate_thumbs = False
+            log.exception(err)
+        sys.exit()
 
 
 if __name__ == '__main__':
@@ -190,9 +188,9 @@ if __name__ == '__main__':
     if os.path.isfile(os.path.expanduser('~/.oron')):
         cfg = SafeConfigParser()
         cfg.read([os.path.expanduser('~/.oron')])
-        username = cfg.get('DEFAULT', 'username')
-        password = cfg.get('DEFAULT', 'password')
-        font = cfg.get('DEFAULT', 'font')
+        username = cfg.get('DEFAULT', 'username', None)
+        password = cfg.get('DEFAULT', 'password', None)
+        font = cfg.get('DEFAULT', 'font', None)
 
 
     parser = OptionParser()
@@ -207,17 +205,25 @@ if __name__ == '__main__':
                       default=font)
 
     options, args = parser.parse_args()
+    if not options.url and options.dest_dir:
+        download_url_file = os.path.join(options.dest_dir, '.url.txt')
+        if os.path.isfile(download_url_file):
+            options.url = open(download_url_file, 'r').read().strip()
+
     if not options.url:
         parser.error("You need to pass the Oron downloads URL")
-    if not options.username:
+    elif not options.username:
         parser.error("You need to pass the Oron username")
     if not options.password:
         parser.error("You need to pass the Oron password")
+    if options.generate_thumbs and not options.font:
+        parser.error("You need to pass the font path")
 
     if os.path.isfile(options.url):
         options.url = open(options.url, 'r').read().strip()
 
     downloader = OronDownloader(options.url, options.username,
                                 options.password, options.dest_dir,
-                                options.generate_thumbs)
+                                options.generate_thumbs,
+                                options.font)
     downloader.download()

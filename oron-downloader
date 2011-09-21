@@ -228,7 +228,6 @@ class OronDownloader(object):
                      "Disabling thumbs generation.")
             self.generate_thumbs = False
             log.exception(err)
-        sys.exit()
 
 
 if __name__ == '__main__':

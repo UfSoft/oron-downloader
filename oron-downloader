@@ -206,8 +206,12 @@ class OronDownloader(object):
             self.generate_thumbs = False
             log.warn("Something went wrong parsing video length. "
                      "Disabling thumbs generation.")
+            print ''.join(['---8<'*30, '---'])
             log.exception(err)
-            print output
+            print ''.join(['---8<'*30, '---'])
+            output
+            print ''.join(['---8<'*30, '---'])
+            return
 
         try:
             args = [

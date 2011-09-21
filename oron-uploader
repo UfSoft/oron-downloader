@@ -33,6 +33,8 @@ class OronUploader(object):
 
     def search_files_to_upload(self):
         for pname in os.listdir(self.source_dir):
+            if pname == '.url.txt':
+                continue
             pname_path = os.path.join(self.source_dir, pname)
             if os.path.islink(pname_path):
                 continue

@@ -50,7 +50,7 @@ class OronUploader(object):
                 "lftp",
                 "%s:%s@ftp.oron.com" % (self.username, self.password),
                 "-e",
-                "\"put %s; exit\"" % fpath
+                "put %s; exit" % fpath
             ])
 
             if retcode != 0:

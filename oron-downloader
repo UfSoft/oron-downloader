@@ -60,7 +60,7 @@ class OronDownloader(object):
         quota_string_match = doc.xpath('//form/table/tr[3]/td[2]/text()')
         if quota_string_match:
             self.download_quota = int(quota_string_match[0].split()[0])
-            log.info("You have %d Mb of download quota.")
+            log.info("You have %d Mb of download quota.", self.download_quota)
         else:
             log.error("Failed to retrieve download quota!")
             sys.exit(1)

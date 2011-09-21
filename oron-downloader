@@ -239,10 +239,14 @@ if __name__ == '__main__':
     if os.path.isfile(os.path.expanduser('~/.oron')):
         cfg = SafeConfigParser()
         cfg.read([os.path.expanduser('~/.oron')])
-        username = cfg.get('DEFAULT', 'username', None)
-        password = cfg.get('DEFAULT', 'password', None)
-        font = cfg.get('DEFAULT', 'font', None)
-        stop_at_quota = cfg.get('DEFAULT', 'stop_at_quota', 500)
+        if cfg.has_option('DEFAULT', 'username'):
+            username = cfg.get('DEFAULT', 'username')
+        if cfg.has_option('DEFAULT', 'password'):
+            password = cfg.get('DEFAULT', 'password')
+        if cfg.has_option('DEFAULT', 'font'):
+            font = cfg.get('DEFAULT', 'font', None)
+        if cfg.has_option('DEFAULT', 'stop_at_quota'):
+            stop_at_quota = cfg.get('DEFAULT', 'stop_at_quota')
 
 
     parser = OptionParser()

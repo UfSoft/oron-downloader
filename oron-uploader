@@ -46,12 +46,17 @@ class OronUploader(object):
     def upload(self):
         for fpath in self.files_to_upload:
             log.info("Uploading %s...", os.path.basename(fpath))
-            subprocess.call([
+            retcode = subprocess.call([
                 "lftp",
                 "%s:%s@ftp.oron.com" % (self.username, self.password),
                 "-e",
                 "\"put %s; exit\"" % fpath
             ])
+
+            if retcode != 0:
+                log.error("Something went wrong. exiting.....")
+                sys.exit(1)
+
             shutil.move(fpath, self.uploaded_path)
             self.uploaded += 1
             log.info("Uploaded %s of %s files",

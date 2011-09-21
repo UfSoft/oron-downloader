@@ -6,6 +6,7 @@ from __future__ import division
 
 import os
 import sys
+import shutil
 import logging
 import subprocess
 
@@ -49,6 +50,7 @@ class OronUploader(object):
                 "-e",
                 "\"put %s; exit\"" % fpath
             ])
+            shutil.move(fpath, self.uploaded_path)
             self.uploaded += 1
             log.info("Uploaded %s of %s files",
                      self.uploaded, len(self.files_to_upload))

@@ -234,21 +234,25 @@ if __name__ == '__main__':
     from optparse import OptionParser
     from ConfigParser import SafeConfigParser
 
-    username = password = None
+    username = password = font = None
+    stop_at_quota = 500
     if os.path.isfile(os.path.expanduser('~/.oron')):
         cfg = SafeConfigParser()
         cfg.read([os.path.expanduser('~/.oron')])
         username = cfg.get('DEFAULT', 'username', None)
         password = cfg.get('DEFAULT', 'password', None)
         font = cfg.get('DEFAULT', 'font', None)
+        stop_at_quota = cfg.get('DEFAULT', 'stop_at_quota', 500)
 
 
     parser = OptionParser()
     parser.add_option('-u', '--url', help="Oron download url")
     parser.add_option('-U', '--username', help="Oron username", default=username)
     parser.add_option('-P', '--password', help="Oron password", default=password)
-    parser.add_option('-Q', '--stop-at-quota', action='store_int', default=500,
-                      help="Stop downloading when quota reaches this value.")
+    parser.add_option(
+        '-Q', '--stop-at-quota', type="int", default=stop_at_quota,
+        help="Stop downloading when quota reaches this value."
+    )
     parser.add_option(
         '-d', '--dest-dir', help="Downloads destination directory",
         default=None

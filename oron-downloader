@@ -18,7 +18,7 @@ log = logging.getLogger(__name__)
 
 class OronDownloader(object):
     def __init__(self, downloads_url, username, password, dest_dir=None,
-                 generate_thumbs=True, font_path=None):
+                 generate_thumbs=True, font_path=None, stop_at_quota=500):
         self.downloads_url = downloads_url
         self.username = username
         self.password = password
@@ -27,12 +27,20 @@ class OronDownloader(object):
         self.dest_dir = dest_dir
         self.generate_thumbs = generate_thumbs
         self.font_path = font_path
+        self.stop_at_quota = stop_at_quota
         log.info("Starting Browser")
         self.browser = Browser("http://oron.com")
         self.to_download = 0
         self.downloaded = 0
+        self.download_quota = 0
+        self.downloads_until_quota_reload = 10
 
     def login(self):
+        if self.browser and self.browser.contents:
+            if self.username in self.browser.contents and \
+                                            'Logout' in self.browser.contents:
+                log.info("Already logged in!")
+                return
         log.info("Logging into Oron.com")
         self.browser.open('http://oron.com/login')
         self.browser.getControl(name='login').value = self.username
@@ -43,6 +51,20 @@ class OronDownloader(object):
             print self.browser.contents
             sys.exit(1)
         log.info("Logged in successfully")
+        self.load_download_quota()
+
+    def load_download_quota(self):
+        log.info("Loading upload quota...")
+        self.browser.open("http://oron.com/?op=my_account")
+        doc = etree.HTML(self.browser.contents)
+        quota_string_match = doc.xpath('//form/table/tr[3]/td[2]/text()')
+        if quota_string_match:
+            self.download_quota = int(quota_string_match[0].split()[0])
+            log.info("You have %d Mb of download quota.")
+        else:
+            log.error("Failed to retrieve download quota!")
+            sys.exit(1)
+
 
     def download(self):
         self.login()
@@ -72,6 +94,8 @@ class OronDownloader(object):
             href = link_td[0].attrib['href']
             size = size_td[0].upper()
             fpath = os.path.join(self.dest_dir, filename)
+            upath = os.path.join(self.dest_dir, 'upped', filename)
+
             if os.path.isfile(fpath):
                 if self.humanize_bytes(os.path.getsize(fpath)) == size:
                     log.info("Filename %s already downloaded. Skipping...",
@@ -81,10 +105,38 @@ class OronDownloader(object):
                 log.info("Downloaded %s/%s of %s so far. Continuing...",
                          self.humanize_bytes(os.path.getsize(fpath)), size,
                          filename)
+
+            elif os.path.isfile(upath):
+                if self.humanize_bytes(os.path.getsize(upath)) == size:
+                    log.info("Filename %s already downloaded. Skipping...",
+                             filename)
+                    self.downloaded += 1
+                    continue
+                log.info("Downloaded %s/%s of %s so far. Continuing...",
+                         self.humanize_bytes(os.path.getsize(upath)), size,
+                         filename)
+
             log.info("Processing %s from %s", filename, href)
             self.download_link(href)
+
             if self.generate_thumbs:
                 self.generate_thumb(filename)
+
+            self.download_quota -= round(float(
+                os.path.getsize(os.path.join(self.dest_dir, filename))
+            )/1024/1024, 1)
+
+            if self.download_quota <= self.stop_at_quota:
+                log.info("Download quota is now %d. Stop downloading for now...",
+                         self.download_quota)
+                sys.exit(0)
+
+            if not self.downloads_until_quota_reload:
+                self.downloads_until_quota_reload = 10
+                self.load_download_quota()
+            else:
+                self.downloads_until_quota_reload -= 1
+
 
     def download_link(self, href):
         self.browser.open(href)
@@ -97,7 +149,6 @@ class OronDownloader(object):
         subprocess.call(["wget", "-c", href ])
         self.downloaded += 1
         log.info("Downloaded %s/%s", self.downloaded, self.to_download)
-
 
     def humanize_bytes(self, bytes, precision=1):
         """Return a humanized string representation of a number of bytes.
@@ -197,12 +248,20 @@ if __name__ == '__main__':
     parser.add_option('-u', '--url', help="Oron download url")
     parser.add_option('-U', '--username', help="Oron username", default=username)
     parser.add_option('-P', '--password', help="Oron password", default=password)
-    parser.add_option('-d', '--dest-dir', help="Downloads destination directory",
-                      default=None)
-    parser.add_option('-t', '--generate-thumbs', action='store_true',
-                      default=False)
-    parser.add_option('-f', '--font', help="Font path to generate the screenshots",
-                      default=font)
+    parser.add_option('-Q', '--stop-at-quota', action='store_int', default=500,
+                      help="Stop downloading when quota reaches this value.")
+    parser.add_option(
+        '-d', '--dest-dir', help="Downloads destination directory",
+        default=None
+    )
+    parser.add_option(
+        '-t', '--generate-thumbs', action='store_true', default=False,
+        help='Generate thumbnail previews of the downloaded videos',
+    )
+    parser.add_option(
+        '-f', '--font', default=font,
+        help="Font path to generate the screenshots"
+    )
 
     options, args = parser.parse_args()
     if not options.url and options.dest_dir:
@@ -225,5 +284,5 @@ if __name__ == '__main__':
     downloader = OronDownloader(options.url, options.username,
                                 options.password, options.dest_dir,
                                 options.generate_thumbs,
-                                options.font)
+                                options.font, options.stop_at_quota)
     downloader.download()

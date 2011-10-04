@@ -15,15 +15,17 @@ logging.basicConfig(format='%(message)s', level=logging.DEBUG)
 log = logging.getLogger(__name__)
 
 class OronUploader(object):
-    def __init__(self, username, password, source_dir):
+    def __init__(self, username, password, source_dir, rate):
         self.username = username
         self.password = password
         if source_dir is None:
             source_dir = os.getcwd()
         self.source_dir = source_dir
+        self.rate = rate
         self.uploaded = 0
         self.uploaded_path = os.path.join(source_dir, 'upped')
         self.files_to_upload = set()
+        self.errors = 0
 
         if not os.path.isdir(self.uploaded_path):
             os.makedirs(self.uploaded_path)
@@ -50,12 +52,17 @@ class OronUploader(object):
                 "lftp",
                 "%s:%s@ftp.oron.com" % (self.username, self.password),
                 "-e",
-                "put %s; exit" % fpath
+                "set net:limit-rate 0:%s; put %s; exit" % (fpath, self.rate*1024)
             ])
 
             if retcode != 0:
                 log.error("Something went wrong. exiting.....")
-                sys.exit(1)
+                self.errors += 1
+                if self.errors > 3:
+                    sys.exit(1)
+                continue
+            else:
+                self.errors = 0
 
             shutil.move(fpath, self.uploaded_path)
             self.uploaded += 1
@@ -68,6 +75,7 @@ if __name__ == '__main__':
     from ConfigParser import SafeConfigParser
 
     username = password = None
+    rate = 90
     if os.path.isfile(os.path.expanduser('~/.oron')):
         cfg = SafeConfigParser()
         cfg.read([os.path.expanduser('~/.oron')])
@@ -75,6 +83,8 @@ if __name__ == '__main__':
             username = cfg.get('DEFAULT', 'username')
         if cfg.has_option('DEFAULT', 'password'):
             password = cfg.get('DEFAULT', 'password')
+        if cfg.has_option('DEFAULT', 'upload-rate'):
+            rate = cfg.get('DEFAULT', 'upload-rate')
 
 
     parser = OptionParser()
@@ -82,6 +92,8 @@ if __name__ == '__main__':
     parser.add_option('-P', '--password', help="Oron password", default=password)
     parser.add_option('-s', '--source-dir', default=None,
                       help="Downloads destination directory")
+    parser.add_option('-r', '--upload-rate', default=rate,
+                      help="Upload rate. Default: %default KB/s")
 
     options, args = parser.parse_args()
     if not options.source_dir and not args:
@@ -89,6 +101,8 @@ if __name__ == '__main__':
 
 
     uploader = OronUploader(
-        options.username, options.password, options.source_dir
+        options.username, options.password, options.source_dir,
+        options.upload_rate
     )
     uploader.upload()
+

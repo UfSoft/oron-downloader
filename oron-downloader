@@ -54,7 +54,7 @@ class OronDownloader(object):
         self.load_download_quota()
 
     def load_download_quota(self):
-        log.info("Loading upload quota...")
+        log.info("Loading download quota...")
         self.browser.open("http://oron.com/?op=my_account")
         doc = etree.HTML(self.browser.contents)
         quota_string_match = doc.xpath('//form/table/tr[3]/td[2]/text()')
@@ -65,9 +65,21 @@ class OronDownloader(object):
             log.error("Failed to retrieve download quota!")
             sys.exit(1)
 
+    def check_quota(self):
+        if self.download_quota <= self.stop_at_quota:
+            log.info("Download quota is now %d. Stop downloading for now...",
+                     self.download_quota)
+            sys.exit(0)
+
+        if not self.downloads_until_quota_reload:
+            self.downloads_until_quota_reload = 10
+            self.load_download_quota()
+        else:
+            self.downloads_until_quota_reload -= 1
 
     def download(self):
         self.login()
+        self.check_quota()
         log.info("Opening downloads URL: %s", self.downloads_url)
         self.browser.open(self.downloads_url)
         self.find_download_links(self.browser.contents)
@@ -95,6 +107,7 @@ class OronDownloader(object):
             size = size_td[0].upper()
             fpath = os.path.join(self.dest_dir, filename)
             upath = os.path.join(self.dest_dir, 'upped', filename)
+            uspath = os.path.join(self.dest_dir, 'upped-n-seen', filename)
 
             if os.path.isfile(fpath):
                 if self.humanize_bytes(os.path.getsize(fpath)) == size:
@@ -116,6 +129,16 @@ class OronDownloader(object):
                          self.humanize_bytes(os.path.getsize(upath)), size,
                          filename)
 
+            elif os.path.isfile(uspath):
+                if self.humanize_bytes(os.path.getsize(uspath)) == size:
+                    log.info("Filename %s already downloaded. Skipping...",
+                             filename)
+                    self.downloaded += 1
+                    continue
+                log.info("Downloaded %s/%s of %s so far. Continuing...",
+                         self.humanize_bytes(os.path.getsize(uspath)), size,
+                         filename)
+
             log.info("Processing %s from %s", filename, href)
             self.download_link(href)
 
@@ -126,16 +149,7 @@ class OronDownloader(object):
                 os.path.getsize(os.path.join(self.dest_dir, filename))
             )/1024/1024, 1)
 
-            if self.download_quota <= self.stop_at_quota:
-                log.info("Download quota is now %d. Stop downloading for now...",
-                         self.download_quota)
-                sys.exit(0)
-
-            if not self.downloads_until_quota_reload:
-                self.downloads_until_quota_reload = 10
-                self.load_download_quota()
-            else:
-                self.downloads_until_quota_reload -= 1
+            self.check_quota()
 
 
     def download_link(self, href):

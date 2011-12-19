@@ -17,9 +17,11 @@ logging.basicConfig(format='%(message)s', level=logging.DEBUG)
 log = logging.getLogger(__name__)
 
 class OronDownloader(object):
-    def __init__(self, downloads_url, username, password, dest_dir=None,
-                 generate_thumbs=True, font_path=None, stop_at_quota=500):
+    def __init__(self, downloads_url, urls_file, username, password,
+                 dest_dir=None, generate_thumbs=True, font_path=None,
+                 stop_at_quota=500):
         self.downloads_url = downloads_url
+        self.urls_file = urls_file
         self.username = username
         self.password = password
         if dest_dir is None:
@@ -80,9 +82,81 @@ class OronDownloader(object):
     def download(self):
         self.login()
         self.check_quota()
-        log.info("Opening downloads URL: %s", self.downloads_url)
-        self.browser.open(self.downloads_url)
-        self.find_download_links(self.browser.contents)
+        if self.urls_file:
+            log.info("Opening download URLs file: %s", self.urls_file)
+            self.find_download_links_from_file()
+        else:
+            log.info("Opening downloads URL: %s", self.downloads_url)
+            self.browser.open(self.downloads_url)
+            self.find_download_links(self.browser.contents)
+
+
+    def find_download_links_from_file(self):
+        urls = open(self.urls_file, 'r').readlines(True)
+        self.to_download = len([u for u in urls if u.strip()])
+
+        for url in urls:
+            if not url.strip():
+                continue
+            log.info("Opening URL: %s", url)
+            self.browser.open(url.strip())
+            doc = etree.HTML(self.browser.contents)
+            info_node = node = doc.xpath('//div[@class="content"]/form/table/tr/td')
+            if info_node:
+                info_node = info_node[0]
+            filename_match = info_node.xpath('./b/text()')
+            if filename_match:
+                filename = filename_match[0]
+            else:
+                file_not_found_match = doc.xpath('//h2/text()')
+                if file_not_found_match:
+                    log.error("File was not found on server. Skipping...")
+                else:
+                    log.error("Could not find out the filename. Skipping...")
+                continue
+            size = info_node.xpath('./text()')[-1].strip().split('File size:')[-1].strip().upper()
+
+            fpath = os.path.join(self.dest_dir, filename)
+            upath = os.path.join(self.dest_dir, 'upped', filename)
+            uspath = os.path.join(self.dest_dir, 'upped-n-seen', filename)
+            usnpath = os.path.join(self.dest_dir, 'upped-not-seen', filename)
+
+            process_next = False
+            for path in (fpath, upath, uspath, usnpath):
+                if os.path.isfile(path):
+                    if self.humanize_bytes(os.path.getsize(path)) == size:
+                        log.info("Filename %s already downloaded(%s). Skipping...",
+                                 filename, path)
+                        self.downloaded += 1
+                        process_next = True
+                        break
+                    log.info("Downloaded %s/%s of %s so far. Continuing...",
+                             self.humanize_bytes(os.path.getsize(path)), size,
+                             filename)
+            if process_next:
+                continue
+
+            log.info("Processing %s from %s", filename, url)
+            self.download_link(url)
+
+            if self.generate_thumbs:
+                self.generate_thumb(filename)
+
+            self.download_quota -= round(float(
+                os.path.getsize(os.path.join(self.dest_dir, filename))
+            )/1024/1024, 1)
+
+            if self.download_quota <= self.stop_at_quota:
+                log.info("Download quota is now %d. Stop downloading for now...",
+                         self.download_quota)
+                sys.exit(0)
+
+            if not self.downloads_until_quota_reload:
+                self.downloads_until_quota_reload = 10
+                self.load_download_quota()
+            else:
+                self.downloads_until_quota_reload -= 1
+
 
     def find_download_links(self, contents):
         log.info("Searching for download links")
@@ -108,36 +182,22 @@ class OronDownloader(object):
             fpath = os.path.join(self.dest_dir, filename)
             upath = os.path.join(self.dest_dir, 'upped', filename)
             uspath = os.path.join(self.dest_dir, 'upped-n-seen', filename)
+            usnpath = os.path.join(self.dest_dir, 'upped-not-seen', filename)
 
-            if os.path.isfile(fpath):
-                if self.humanize_bytes(os.path.getsize(fpath)) == size:
-                    log.info("Filename %s already downloaded. Skipping...",
+            process_next = False
+            for path in (fpath, upath, uspath, usnpath):
+                if os.path.isfile(path):
+                    if self.humanize_bytes(os.path.getsize(path)) == size:
+                        log.info("Filename %s already downloaded(%s). Skipping...",
+                                 filename, path)
+                        self.downloaded += 1
+                        process_next = True
+                        break
+                    log.info("Downloaded %s/%s of %s so far. Continuing...",
+                             self.humanize_bytes(os.path.getsize(path)), size,
                              filename)
-                    self.downloaded += 1
-                    continue
-                log.info("Downloaded %s/%s of %s so far. Continuing...",
-                         self.humanize_bytes(os.path.getsize(fpath)), size,
-                         filename)
-
-            elif os.path.isfile(upath):
-                if self.humanize_bytes(os.path.getsize(upath)) == size:
-                    log.info("Filename %s already downloaded. Skipping...",
-                             filename)
-                    self.downloaded += 1
-                    continue
-                log.info("Downloaded %s/%s of %s so far. Continuing...",
-                         self.humanize_bytes(os.path.getsize(upath)), size,
-                         filename)
-
-            elif os.path.isfile(uspath):
-                if self.humanize_bytes(os.path.getsize(uspath)) == size:
-                    log.info("Filename %s already downloaded. Skipping...",
-                             filename)
-                    self.downloaded += 1
-                    continue
-                log.info("Downloaded %s/%s of %s so far. Continuing...",
-                         self.humanize_bytes(os.path.getsize(uspath)), size,
-                         filename)
+            if process_next:
+                continue
 
             log.info("Processing %s from %s", filename, href)
             self.download_link(href)
@@ -269,6 +329,7 @@ if __name__ == '__main__':
 
     parser = OptionParser()
     parser.add_option('-u', '--url', help="Oron download url")
+    parser.add_option('-f', '--urls-file', help="Oron download urls file")
     parser.add_option('-U', '--username', help="Oron username", default=username)
     parser.add_option('-P', '--password', help="Oron password", default=password)
     parser.add_option(
@@ -284,7 +345,7 @@ if __name__ == '__main__':
         help='Generate thumbnail previews of the downloaded videos',
     )
     parser.add_option(
-        '-f', '--font', default=font,
+        '-F', '--font', default=font,
         help="Font path to generate the screenshots"
     )
 
@@ -294,8 +355,14 @@ if __name__ == '__main__':
         if os.path.isfile(download_url_file):
             options.url = open(download_url_file, 'r').read().strip()
 
-    if not options.url:
-        parser.error("You need to pass the Oron downloads URL")
+    if not (options.url or options.urls_file):
+        if not options.url:
+            parser.error("You need to pass the Oron downloads URL")
+        elif not options.urls_files:
+            parser.error("You need to pass the Oron download URLs file")
+        else:
+            parser.error("You need to pass either the Oron downloads URL or "
+                         "the Oron downloads URLs file")
     elif not options.username:
         parser.error("You need to pass the Oron username")
     if not options.password:
@@ -303,11 +370,11 @@ if __name__ == '__main__':
     if options.generate_thumbs and not options.font:
         parser.error("You need to pass the font path")
 
-    if os.path.isfile(options.url):
+    if options.url and os.path.isfile(options.url):
         options.url = open(options.url, 'r').read().strip()
 
-    downloader = OronDownloader(options.url, options.username,
-                                options.password, options.dest_dir,
-                                options.generate_thumbs,
+    downloader = OronDownloader(options.url, options.urls_file,
+                                options.username, options.password,
+                                options.dest_dir, options.generate_thumbs,
                                 options.font, options.stop_at_quota)
     downloader.download()

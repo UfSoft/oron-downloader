@@ -47,7 +47,8 @@ class OronUploader(object):
 
     def upload(self):
         for fpath in self.files_to_upload:
-            log.info("Uploading %s...", os.path.basename(fpath))
+            log.info("Uploading %s at max rate of %.2f Kbsp...",
+                     os.path.basename(fpath), self.upload_limit/1024)
             retcode = subprocess.call([
                 "lftp",
                 "%s:%s@ftp.oron.com" % (self.username, self.password),

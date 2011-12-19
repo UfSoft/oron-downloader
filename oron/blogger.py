@@ -120,7 +120,6 @@ class Blogger(object):
                     continue
 
                 image_html_match = image_html_match[0]
-                print chunk
                 links.append((
                     filename,
                     self.links[filename]['size'],
@@ -129,7 +128,7 @@ class Blogger(object):
                 ))
 
             html = HTML_TEMPLATE.render(links=links)
-            open(self.output_dir, title+'.txt').write(html)
+            open(os.path.join(self.output_dir, title+'.txt'), 'w').write(html)
 
             print title
             print html

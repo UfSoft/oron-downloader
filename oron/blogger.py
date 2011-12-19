@@ -87,9 +87,6 @@ class Blogger(object):
                 'href': href, 'size': size, 'filename': filename
             }
 
-            c = browser.getControl(name='images[]', index=0)
-            u = browser.getControl('upload')
-
 
     def create_posts(self):
         self.grab_links()

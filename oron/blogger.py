@@ -99,7 +99,8 @@ class Blogger(object):
             links = []
             for filename in chunk:
                 screenshot_name = filename + '.jpg'
-                if not os.path.isfile(self.screenshots_dir, screenshot_name):
+                screenshot_path = os.path.join(self.screenshots_dir, screenshot_name)
+                if not os.path.isfile(screenshot_path):
                     log.error("Screenshot %s does not exist!!!", screenshot_name)
                     continue
 
@@ -107,7 +108,7 @@ class Blogger(object):
                 browser = Browser("http://www.freeporndumpster.com/legacy.php")
                 file_control = browser.getControl(name='images[]', index=0)
                 file_control.add_file(
-                    open(os.path.join(self.screenshots_dir, screenshot_name)),
+                    open(screenshot_path),
                     "image/jpeg", screenshot_name
                 )
                 browser.getControl('upload').click()

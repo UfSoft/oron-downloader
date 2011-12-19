@@ -14,6 +14,8 @@ import re
 import sys
 import logging
 import subprocess
+from optparse import OptionParser
+from ConfigParser import SafeConfigParser
 from lxml import etree
 from zope.testbrowser.browser import Browser
 
@@ -318,9 +320,6 @@ class OronDownloader(object):
 
 
 def main():
-    from optparse import OptionParser
-    from ConfigParser import SafeConfigParser
-
     username = password = font = None
     stop_at_quota = 500
     if os.path.isfile(os.path.expanduser('~/.oron')):

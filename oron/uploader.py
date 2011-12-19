@@ -14,6 +14,8 @@ import sys
 import shutil
 import logging
 import subprocess
+from optparse import OptionParser
+from ConfigParser import SafeConfigParser
 
 logging.basicConfig(format='%(message)s', level=logging.DEBUG)
 
@@ -77,9 +79,6 @@ class OronUploader(object):
 
 
 def main():
-    from optparse import OptionParser
-    from ConfigParser import SafeConfigParser
-
     username = password = None
     rate = 90
     if os.path.isfile(os.path.expanduser('~/.oron')):

@@ -188,6 +188,10 @@ def main():
         parser.error("You need to pass the Oron folder URL")
     if not options.title_base:
         parser.error("You need to provide a base title")
+    if not options.screenshots:
+        parser.error("You need to provide the path to the screenshots")
+    if not options.output:
+        parser.error("You need to provide the path to the html output directory")
 
     blogger = Blogger(options)
     blogger.create_posts()

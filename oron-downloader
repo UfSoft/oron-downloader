@@ -102,11 +102,9 @@ class OronDownloader(object):
             self.browser.open(url.strip())
             doc = etree.HTML(self.browser.contents)
             info_node = node = doc.xpath('//div[@class="content"]/form/table/tr/td')
+            #log.info("Info node match: %s", info_node)
             if info_node:
                 info_node = info_node[0]
-            filename_match = info_node.xpath('./b/text()')
-            if filename_match:
-                filename = filename_match[0]
             else:
                 file_not_found_match = doc.xpath('//h2/text()')
                 if file_not_found_match:
@@ -114,6 +112,12 @@ class OronDownloader(object):
                 else:
                     log.error("Could not find out the filename. Skipping...")
                 continue
+
+            filename_match = info_node.xpath('./b/text()')
+            #log.info("filename match is %s", filename_match)
+            if filename_match:
+                filename = filename_match[0]
+
             size = info_node.xpath('./text()')[-1].strip().split('File size:')[-1].strip().upper()
 
             fpath = os.path.join(self.dest_dir, filename)

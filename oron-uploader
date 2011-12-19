@@ -47,12 +47,12 @@ class OronUploader(object):
 
     def upload(self):
         for fpath in self.files_to_upload:
-            log.info("Uploading %s...", os.path.basename(fpath))
+            log.info("Uploading %s at a max rate of %sK/s...", os.path.basename(fpath), self.rate)
             retcode = subprocess.call([
                 "lftp",
                 "%s:%s@ftp.oron.com" % (self.username, self.password),
                 "-e",
-                "set net:limit-rate 0:%s; put %s; exit" % (fpath, self.rate*1024)
+                "set net:limit-rate 0:%s; put %s; exit" % (self.rate*1024, fpath)
             ])
 
             if retcode != 0:
@@ -92,7 +92,7 @@ if __name__ == '__main__':
     parser.add_option('-P', '--password', help="Oron password", default=password)
     parser.add_option('-s', '--source-dir', default=None,
                       help="Downloads destination directory")
-    parser.add_option('-r', '--upload-rate', default=rate,
+    parser.add_option('-r', '--upload-rate', default=rate, type='int',
                       help="Upload rate. Default: %default KB/s")
 
     options, args = parser.parse_args()

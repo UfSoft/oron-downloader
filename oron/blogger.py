@@ -54,6 +54,7 @@ class Blogger(object):
         self.email_recipient = options.email
         self.email_initial_text = options.email_initial_text
         self.email_ending_text = options.email_ending_text
+        self.start_on_post = options.start_on_post
 
         log.info("Starting Browser")
         self.browser = Browser("http://oron.com")
@@ -114,6 +115,12 @@ class Blogger(object):
         chunker = Chunker(self.links_per_post)
         n = 1
         for chunk in chunker(filenames):
+            if n < self.start_on_post:
+                log.info("Skipping post %d since we should start on %s",
+                         n, self.start_on_post)
+                n += 1
+                continue
+
             log.info("Processing post %s of %s", n, self.total_posts)
             title = self.title_base + ' - %d of %d' % (n, self.total_posts)
             links = []
@@ -291,6 +298,7 @@ def main():
                       default=email_recipient)
     email.add_option('--email-initial-text', help="Initial email text.")
     email.add_option('--email-ending-text', help="Ending email text.")
+    email.add_option('--start-on-post', help="Start on post number N", type='int', default=1)
     parser.add_option_group(email)
 
 

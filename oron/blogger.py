@@ -224,8 +224,6 @@ class Blogger(object):
                 else:
                     server.quit()
                 log.info("Notification email sent.")
-            if n > 26:
-                break
 
 
 class Chunker(object):

@@ -149,6 +149,8 @@ class Blogger(object):
                         image_html = image_html_match[0]
                     else:
                         log.error("Failed to get uploaded image html")
+                else:
+                    log.warn("There's no screenshot for filename %s", filename)
 
                 links.append((
                     filename,

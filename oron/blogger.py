@@ -52,8 +52,8 @@ class Blogger(object):
         self.smtp_from = options.smtp_from
         self.smtp_use_tls = options.smtp_use_tls
         self.email_recipient = options.email
-        self.email_initial_text = options.initial_text
-        self.email_ending_text = options.ending_text
+        self.email_initial_text = options.email_initial_text
+        self.email_ending_text = options.email_ending_text
 
         log.info("Starting Browser")
         self.browser = Browser("http://oron.com")

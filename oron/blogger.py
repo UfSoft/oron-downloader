@@ -114,10 +114,10 @@ class Blogger(object):
         filenames = sorted(self.links.keys())
         chunker = Chunker(self.links_per_post)
         n = 1
+        if n < self.start_on_post:
+            log.info("Skipping posts %d to %d", n, self.start_on_post)
         for chunk in chunker(filenames):
             if n < self.start_on_post:
-                log.info("Skipping post %d since we should start on %s",
-                         n, self.start_on_post)
                 n += 1
                 continue
 

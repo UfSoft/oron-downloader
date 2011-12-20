@@ -128,7 +128,7 @@ class Blogger(object):
                 screenshot_name = filename + '.jpg'
                 screenshot_path = os.path.join(self.screenshots_dir, screenshot_name)
 
-                image_html = "<em>Missing Image html for <b>%s</b></em>" % filename
+                image_html = "<em>Missing Image preview for <b>%s</b></em>" % filename
 
                 if os.path.isfile(screenshot_path):
                     log.info("Uploading screenshot %s", screenshot_name)

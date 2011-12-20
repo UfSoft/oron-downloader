@@ -84,7 +84,10 @@ class Blogger(object):
         self.total_links = len(doc.xpath(
             '//table[@class="tbl2"]/tr/td[1]/a[@target="_blank"]/small'
         ))
-        log.info("Found %d links to create blog posts.", self.total_links)
+        self.total_posts = int(round(self.total_links/(self.links_per_post*1.0)))
+
+        log.info("Found %d links to create %s blog posts.",
+                 self.total_links, self.total_posts)
         trs = doc.xpath('//table[@class="tbl2"]/tr')
         for tr in trs:
             link_td = tr.xpath('td[1]/a')
@@ -109,37 +112,36 @@ class Blogger(object):
         self.grab_links()
         filenames = sorted(self.links.keys())
         chunker = Chunker(self.links_per_post)
-        total_posts = int(round(self.total_links/(self.links_per_post*1.0)))
         n = 1
         for chunk in chunker(filenames):
-            title = self.title_base + ' - %d of %d' % (n, total_posts)
-            print
+            log.info("Processing post %s of %s", n, self.total_posts)
+            title = self.title_base + ' - %d of %d' % (n, self.total_posts)
             links = []
             for filename in chunk:
                 screenshot_name = filename + '.jpg'
                 screenshot_path = os.path.join(self.screenshots_dir, screenshot_name)
-                if not os.path.isfile(screenshot_path):
-                    log.error("Screenshot %s does not exist!!!", screenshot_name)
-                    continue
 
-                log.info("Uploading screenshot %s", screenshot_name)
-                browser = Browser("http://www.freeporndumpster.com/legacy.php")
-                caption_control = browser.getControl(name='imagename[]', index=0)
-                caption_control.value = self.links[filename]['href']
-                file_control = browser.getControl(name='images[]', index=0)
-                file_control.add_file(
-                    open(screenshot_path),
-                    "image/jpeg", screenshot_name
-                )
-                browser.getControl('upload').click()
-
-                doc = etree.HTML(browser.contents)
                 image_html = "<em>Missing Image html for <b>%s</b></em>" % filename
-                image_html_match = doc.xpath('//table/tr/td/p[contains(., "website")]/textarea/text()')
-                if image_html_match:
-                    image_html = image_html_match[0]
-                else:
-                    log.error("Failed to get uploaded image html")
+
+                if os.path.isfile(screenshot_path):
+                    log.info("Uploading screenshot %s", screenshot_name)
+                    browser = Browser("http://www.freeporndumpster.com/legacy.php")
+                    caption_control = browser.getControl(name='imagename[]', index=0)
+                    caption_control.value = self.links[filename]['href']
+                    file_control = browser.getControl(name='images[]', index=0)
+                    file_control.add_file(
+                        open(screenshot_path),
+                        "image/jpeg", screenshot_name
+                    )
+                    browser.getControl('upload').click()
+
+                    doc = etree.HTML(browser.contents)
+                    image_html = "<em>Missing Image html for <b>%s</b></em>" % filename
+                    image_html_match = doc.xpath('//table/tr/td/p[contains(., "website")]/textarea/text()')
+                    if image_html_match:
+                        image_html = image_html_match[0]
+                    else:
+                        log.error("Failed to get uploaded image html")
 
                 links.append((
                     filename,

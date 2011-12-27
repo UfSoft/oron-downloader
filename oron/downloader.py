@@ -12,6 +12,8 @@ from __future__ import division
 import os
 import re
 import sys
+import socket
+import urllib2
 import logging
 import subprocess
 from optparse import OptionParser
@@ -147,8 +149,18 @@ class OronDownloader(object):
             if process_next:
                 continue
 
-            log.info("Processing %s from %s", filename, url)
-            self.download_link(url)
+            errors = 1
+            while errors <= 4:
+                log.info("Processing[%s] %s from %s", errors, filename, href)
+                try:
+                    self.download_link(href)
+                    break
+                except (socket.error, urllib2.URLError), err:
+                    log.error("Failed to download link: %s", err)
+                    errors += 1
+            else:
+                log.info("Too many errors, continue to next link")
+                continue
 
             if self.generate_thumbs:
                 self.generate_thumb(filename)
@@ -210,8 +222,18 @@ class OronDownloader(object):
             if process_next:
                 continue
 
-            log.info("Processing %s from %s", filename, href)
-            self.download_link(href)
+            errors = 1
+            while errors <= 4:
+                log.info("Processing[%s] %s from %s", errors, filename, href)
+                try:
+                    self.download_link(href)
+                    break
+                except (socket.error, urllib2.URLError), err:
+                    log.error("Failed to download link: %s", err)
+                    errors += 1
+            else:
+                log.info("Too many errors, continue to next link")
+                continue
 
             if self.generate_thumbs:
                 self.generate_thumb(filename)
@@ -389,3 +411,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+

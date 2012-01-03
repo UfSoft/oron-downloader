@@ -26,10 +26,10 @@ logging.basicConfig(format='%(message)s', level=logging.DEBUG)
 log = logging.getLogger(__name__)
 
 class OronDownloader(object):
-    def __init__(self, downloads_url, urls_file, username, password,
+    def __init__(self, downloads_urls, urls_file, username, password,
                  dest_dir=None, generate_thumbs=True, font_path=None,
                  stop_at_quota=500):
-        self.downloads_url = downloads_url
+        self.downloads_urls = downloads_urls
         self.urls_file = urls_file
         self.username = username
         self.password = password
@@ -95,14 +95,17 @@ class OronDownloader(object):
             log.info("Opening download URLs file: %s", self.urls_file)
             self.find_download_links_from_file()
         else:
-            log.info("Opening downloads URL: %s", self.downloads_url)
-            self.browser.open(self.downloads_url)
-            self.find_download_links(self.browser.contents)
+            log.info("Processing %d oron folder urls", len(self.downloads_urls))
+            for url in self.downloads_urls:
+                log.info("Opening downloads URL: %s", url)
+                self.browser.open(url)
+                self.find_download_links(self.browser.contents)
 
 
     def find_download_links_from_file(self):
         urls = open(self.urls_file, 'r').readlines(True)
         self.to_download = len([u for u in urls if u.strip()])
+        log.info("Processing %d oron file urls", self.to_download)
 
         for url in urls:
             if not url.strip():
@@ -151,9 +154,9 @@ class OronDownloader(object):
 
             errors = 1
             while errors <= 4:
-                log.info("Processing[%s] %s from %s", errors, filename, href)
+                log.info("Processing[%s] %s from %s", errors, filename, url)
                 try:
-                    self.download_link(href)
+                    self.download_link(url)
                     break
                 except (socket.error, urllib2.URLError), err:
                     log.error("Failed to download link: %s", err)
@@ -358,7 +361,7 @@ def main():
 
 
     parser = OptionParser()
-    parser.add_option('-u', '--url', help="Oron download url")
+    parser.add_option('-u', '--url', help="Oron download url", action="append", default=[])
     parser.add_option('-f', '--urls-file', help="Oron download urls file")
     parser.add_option('-U', '--username', help="Oron username", default=username)
     parser.add_option('-P', '--password', help="Oron password", default=password)
@@ -383,7 +386,8 @@ def main():
     if not options.url and options.dest_dir:
         download_url_file = os.path.join(options.dest_dir, '.url.txt')
         if os.path.isfile(download_url_file):
-            options.url = open(download_url_file, 'r').read().strip()
+            for line in open(download_url_file, 'r').readlines():
+                options.url.append(line.strip())
 
     if not (options.url or options.urls_file):
         if not options.url:
@@ -400,14 +404,18 @@ def main():
     if options.generate_thumbs and not options.font:
         parser.error("You need to pass the font path")
 
-    if options.url and os.path.isfile(options.url):
-        options.url = open(options.url, 'r').read().strip()
+    #if options.url and os.path.isfile(options.url):
+    #    options.url = open(options.url, 'r').read().strip()
 
     downloader = OronDownloader(options.url, options.urls_file,
                                 options.username, options.password,
                                 options.dest_dir, options.generate_thumbs,
                                 options.font, options.stop_at_quota)
-    downloader.download()
+
+    try:
+        downloader.download()
+    except KeyboardInterrupt:
+        log.info("CTRL-C pressed. Exiting...")
 
 if __name__ == '__main__':
     main()

@@ -16,19 +16,25 @@ import logging
 import subprocess
 from optparse import OptionParser
 from ConfigParser import SafeConfigParser
+from oron.utils import OronLinksParser
 
 logging.basicConfig(format='%(message)s', level=logging.DEBUG)
 
 log = logging.getLogger(__name__)
 
 class OronUploader(object):
-    def __init__(self, username, password, source_dir, rate):
+    def __init__(self, username, password, source_dir, rate, compare_url=None):
         self.username = username
         self.password = password
         if source_dir is None:
             source_dir = os.getcwd()
         self.source_dir = source_dir
         self.rate = rate
+        self.uploaded_filenames = []
+        if compare_url is not None:
+            links_parser = OronLinksParser(compare_url)
+            links_parser.parse()
+            self.uploaded_filenames = links_parser.filenames.keys()
         self.uploaded = 0
         self.uploaded_path = os.path.join(source_dir, 'upped')
         self.files_to_upload = set()
@@ -43,6 +49,8 @@ class OronUploader(object):
     def search_files_to_upload(self):
         for pname in os.listdir(self.source_dir):
             if pname == '.url.txt':
+                continue
+            elif pname in self.uploaded_filenames:
                 continue
             pname_path = os.path.join(self.source_dir, pname)
             if os.path.islink(pname_path):
@@ -99,6 +107,9 @@ def main():
                       help="Downloads destination directory")
     parser.add_option('-r', '--upload-rate', default=rate, type='int',
                       help="Upload rate. Default: %default KB/s")
+    parser.add_option('-u', '--compare-url', default=None,
+                      help="The oron folder url to compare for already "
+                           "uploaded files")
 
     options, args = parser.parse_args()
     if not options.source_dir and not args:
@@ -107,7 +118,7 @@ def main():
 
     uploader = OronUploader(
         options.username, options.password, options.source_dir,
-        options.upload_rate
+        options.upload_rate, compare_url=options.compare_url
     )
     uploader.upload()
 

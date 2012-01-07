@@ -110,6 +110,8 @@ class OronDownloader(object):
         for url in urls:
             if not url.strip():
                 continue
+            url = url.strip()
+            log.info('-'*78)
             log.info("Opening URL: %s", url)
             self.browser.open(url.strip())
             doc = etree.HTML(self.browser.contents)
@@ -128,7 +130,7 @@ class OronDownloader(object):
             filename_match = info_node.xpath('./b/text()')
             #log.info("filename match is %s", filename_match)
             if filename_match:
-                filename = filename_match[0]
+                filename = filename_match[0].encode('utf8')
 
             size = info_node.xpath('./text()')[-1].strip().split('File size:')[-1].strip().upper()
 
@@ -139,16 +141,21 @@ class OronDownloader(object):
 
             process_next = False
             for path in (fpath, upath, uspath, usnpath):
-                if os.path.isfile(path):
-                    if self.humanize_bytes(os.path.getsize(path)) == size:
-                        log.info("Filename %s already downloaded(%s). Skipping...",
-                                 filename, path)
-                        self.downloaded += 1
-                        process_next = True
-                        break
-                    log.info("Downloaded %s/%s of %s so far. Continuing...",
-                             self.humanize_bytes(os.path.getsize(path)), size,
-                             filename)
+                try:
+                    if os.path.isfile(path):
+                        if self.humanize_bytes(os.path.getsize(path)) == size:
+                            log.info("Filename %s already downloaded(%s). Skipping...",
+                                     filename, path)
+                            self.downloaded += 1
+                            process_next = True
+                            break
+                        log.info("Downloaded %s/%s of %s so far. Continuing...",
+                                 self.humanize_bytes(os.path.getsize(path)), size,
+                                 filename)
+                except UnicodeEncodeError:
+                    print 'Unicode error for filename', filename
+                    process_next = True
+                    break
             if process_next:
                 continue
 
@@ -201,6 +208,7 @@ class OronDownloader(object):
             filename_search = link_td[0].xpath('small/text()')
             if not filename_search:
                 continue
+            log.info('-'*78)
             filename = filename_search[0]
 
             href = link_td[0].attrib['href']
@@ -249,13 +257,20 @@ class OronDownloader(object):
 
 
     def download_link(self, href):
+        log.info("Generating URL...")
         self.browser.open(href)
         self.browser.getForm(name='F1').submit(" Create Download Link ")
         self.browser.getLink("Download File")
         fdoc = etree.HTML(self.browser.contents)
         wget_links = fdoc.xpath('//table/tr/td/a[@class="atitle"]')
         for wget_link in wget_links:
+            print 'Gathered Link HREFs',
+            try:
+                print wget_link, wget_link.attrib['href']
+            except Exception:
+                pass
             href = wget_link.attrib['href']
+        log.info("Generated URL: %s", href)
         subprocess.call(["wget", "-c", href ])
         self.downloaded += 1
         log.info("Downloaded %s/%s", self.downloaded, self.to_download)

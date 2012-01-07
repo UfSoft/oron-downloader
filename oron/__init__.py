@@ -13,3 +13,7 @@ __email__        = 'pedro@algarvio.me'
 __license__      = 'BSD'
 __url__          = 'http://dev.ufsoft.org/projects/oron-downloader'
 __description__  = __doc__
+
+import socket
+# Set a default socket timeout to 15 seconds
+socket.setdefaulttimeout(15.0)

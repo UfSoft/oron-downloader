@@ -13,6 +13,7 @@ import os
 import sys
 import shutil
 import logging
+import mimetypes
 import subprocess
 from optparse import OptionParser
 from ConfigParser import SafeConfigParser
@@ -23,42 +24,51 @@ logging.basicConfig(format='%(message)s', level=logging.DEBUG)
 log = logging.getLogger(__name__)
 
 class OronUploader(object):
-    def __init__(self, username, password, source_dir, rate, compare_url=None):
+    def __init__(self, username, password, source_dirs, rate, compare_url=None,
+                 move_uploaded=True, match_mimetype='video'):
         self.username = username
         self.password = password
-        if source_dir is None:
-            source_dir = os.getcwd()
-        self.source_dir = source_dir
+        if source_dirs is []:
+            source_dirs = [os.getcwd()]
+        self.source_dirs = source_dirs
         self.rate = rate
         self.uploaded_filenames = []
         if compare_url is not None:
             links_parser = OronLinksParser(compare_url)
             links_parser.parse()
             self.uploaded_filenames = links_parser.filenames.keys()
+        self.move_uploaded = move_uploaded
+        self.match_mimetype = match_mimetype
         self.uploaded = 0
-        self.uploaded_path = os.path.join(source_dir, 'upped')
         self.files_to_upload = set()
         self.errors = 0
-
-        if not os.path.isdir(self.uploaded_path):
-            os.makedirs(self.uploaded_path)
 
         self.search_files_to_upload()
         log.info("Found %d files to upload", len(self.files_to_upload))
 
     def search_files_to_upload(self):
-        for pname in os.listdir(self.source_dir):
-            if pname == '.url.txt':
-                continue
-            elif pname in self.uploaded_filenames:
-                continue
-            pname_path = os.path.join(self.source_dir, pname)
-            if os.path.islink(pname_path):
-                continue
-            elif os.path.isdir(pname_path):
-                continue
-            elif os.path.isfile(pname_path):
-                self.files_to_upload.add(pname_path)
+        msg = "Search files to upload"
+        if self.match_mimetype:
+            msg += " matching mimetype \"%s\"" % self.match_mimetype
+        log.info(msg+'...')
+        for source_dir in self.source_dirs:
+            for pname in os.listdir(source_dir):
+                if pname == '.url.txt':
+                    continue
+                elif pname in self.uploaded_filenames:
+                    continue
+                pname_path = os.path.join(source_dir, pname)
+                mimetype = mimetypes.guess_type(pname_path)
+                if os.path.islink(pname_path):
+                    continue
+                elif os.path.isdir(pname_path):
+                    continue
+                elif self.match_mimetype and not filter(None, mimetype):
+                    continue
+                elif self.match_mimetype and mimetype and self.match_mimetype not in mimetype[0]:
+                    continue
+                elif os.path.isfile(pname_path):
+                    self.files_to_upload.add(pname_path)
 
     def upload(self):
         for fpath in self.files_to_upload:
@@ -80,7 +90,11 @@ class OronUploader(object):
             else:
                 self.errors = 0
 
-            shutil.move(fpath, self.uploaded_path)
+            if self.move_uploaded:
+                uploaded_path = os.path.join(os.path.dirname(fpath, 'upped'))
+                if not os.path.isdir(uploaded_path):
+                    os.makedirs(uploaded_path)
+                shutil.move(fpath, self.uploaded_path)
             self.uploaded += 1
             log.info("Uploaded %s of %s files",
                      self.uploaded, len(self.files_to_upload))
@@ -103,13 +117,16 @@ def main():
     parser = OptionParser()
     parser.add_option('-U', '--username', help="Oron username", default=username)
     parser.add_option('-P', '--password', help="Oron password", default=password)
-    parser.add_option('-s', '--source-dir', default=None,
+    parser.add_option('-s', '--source-dir', default=[], action='append',
                       help="Downloads destination directory")
     parser.add_option('-r', '--upload-rate', default=rate, type='int',
                       help="Upload rate. Default: %default KB/s")
     parser.add_option('-u', '--compare-url', default=None,
                       help="The oron folder url to compare for already "
                            "uploaded files")
+    parser.add_option('-d', '--dont-move-uploaded', default=False,
+                      action='store_true', help="Don't move uploaded files")
+    parser.add_option('-m', '--match-mimetype', default=None, help='Match specific mimetype')
 
     options, args = parser.parse_args()
     if not options.source_dir and not args:
@@ -118,7 +135,9 @@ def main():
 
     uploader = OronUploader(
         options.username, options.password, options.source_dir,
-        options.upload_rate, compare_url=options.compare_url
+        options.upload_rate, compare_url=options.compare_url,
+        move_uploaded=not options.dont_move_uploaded,
+        match_mimetype=options.match_mimetype
     )
     uploader.upload()
 

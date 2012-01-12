@@ -112,9 +112,21 @@ class OronDownloader(object):
                 continue
             url = url.strip()
             log.info('-'*78)
-            log.info("Opening URL: %s", url)
-            self.browser.open(url.strip())
-            doc = etree.HTML(self.browser.contents)
+            log.info("[%d/%d] Opening URL: %s", self.downloaded+1, self.to_download, url)
+            attempts = 0
+            while True:
+                try:
+                    self.browser.open(url.strip())
+                    doc = etree.HTML(self.browser.contents)
+                    break
+                except socket.timeout:
+                    if attempts > 2:
+                        break
+                    log.info("Socket timeout. retrying...")
+                    attempts += 1
+            if attempts > 2:
+                log.info("Too many timeouts. Continue to next...")
+                continue
             info_node = node = doc.xpath('//div[@class="content"]/form/table/tr/td')
             #log.info("Info node match: %s", info_node)
             if info_node:
@@ -160,8 +172,8 @@ class OronDownloader(object):
             if process_next:
                 continue
 
-            errors = 1
-            while errors <= 4:
+            errors = 0
+            while errors <= 3:
                 log.info("Processing[%s] %s from %s", errors, filename, url)
                 try:
                     self.download_link(url)
@@ -234,9 +246,11 @@ class OronDownloader(object):
             if process_next:
                 continue
 
-            errors = 1
-            while errors <= 4:
-                log.info("Processing[%s] %s from %s", errors, filename, href)
+            errors = 0
+            while errors <= 3:
+                log.info("[%d/%d] Processing[errors=%s] %s from %s",
+                        self.downloaded+1, self.to_download, errors,
+                        filename, href)
                 try:
                     self.download_link(href)
                     break

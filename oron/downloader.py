@@ -135,12 +135,13 @@ class OronDownloader(object):
             size = info_node.xpath('./text()')[-1].strip().split('File size:')[-1].strip().upper()
 
             fpath = os.path.join(self.dest_dir, filename)
+            spath = os.path.join(self.dest_dir, 'seen', filename)
             upath = os.path.join(self.dest_dir, 'upped', filename)
             uspath = os.path.join(self.dest_dir, 'upped-n-seen', filename)
             usnpath = os.path.join(self.dest_dir, 'upped-not-seen', filename)
 
             process_next = False
-            for path in (fpath, upath, uspath, usnpath):
+            for path in (fpath, spath, upath, uspath, usnpath):
                 try:
                     if os.path.isfile(path):
                         if self.humanize_bytes(os.path.getsize(path)) == size:

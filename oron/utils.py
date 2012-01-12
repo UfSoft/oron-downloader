@@ -29,7 +29,7 @@ class OronLinksParser(object):
         self.total_files = 0
 
     def parse(self):
-        log.info("Opening downloads URL: %s", self.url)
+        log.info("Opening oron URL: %s", self.url)
         self.browser.open(self.url)
         # Test to see if we're browsing a folder
         doc = etree.HTML(self.browser.contents)
@@ -64,7 +64,7 @@ class OronLinksParser(object):
         self.filenames[filename] = OronFile(self.url, filename, size)
 
     def find_download_links(self, doc):
-        log.info("Found %d links to download.", self.total_files)
+        log.info("Found %d links.", self.total_files)
         trs = doc.xpath('//table[@class="tbl2"]/tr')
         for tr in trs:
             link_td = tr.xpath('td[1]/a')
